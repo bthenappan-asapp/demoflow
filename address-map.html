@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Address Cluster Map</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css"/>
+<style>
+  :root {
+    --bg: #0a0c10;
+    --surface: #12151c;
+    --border: #1e2430;
+    --accent: #f0c040;
+    --accent2: #40c0f0;
+    --accent3: #f04060;
+    --text: #e8eaf0;
+    --muted: #6b7280;
+    --card: #161b26;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-shrink: 0;
+  }
+  header h1 {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 18px;
+    color: var(--accent);
+    letter-spacing: 0.02em;
+  }
+  header span {
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .stat-pills {
+    display: flex;
+    gap: 10px;
+    margin-left: auto;
+    flex-wrap: wrap;
+  }
+  .pill {
+    background: var(--border);
+    border: 1px solid #2a3040;
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-size: 11px;
+    color: var(--text);
+    white-space: nowrap;
+  }
+  .pill strong { color: var(--accent); }
+  .main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+  #map {
+    flex: 1;
+    background: #0d1117;
+  }
+  .sidebar {
+    width: 300px;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .sidebar-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .tab {
+    flex: 1;
+    padding: 10px;
+    font-size: 11px;
+    font-family: 'Space Mono', monospace;
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+  }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .sidebar-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+  }
+  .sidebar-content::-webkit-scrollbar { width: 4px; }
+  .sidebar-content::-webkit-scrollbar-track { background: var(--surface); }
+  .sidebar-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .rank-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    margin-bottom: 6px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .rank-item:hover { border-color: var(--accent); }
+  .rank-num {
+    font-size: 10px;
+    color: var(--muted);
+    width: 18px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+  .rank-label {
+    flex: 1;
+    font-size: 11px;
+    color: var(--text);
+    line-height: 1.3;
+  }
+  .rank-label small { color: var(--muted); font-size: 10px; display: block; }
+  .rank-bar-wrap {
+    width: 60px;
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .rank-bar {
+    height: 100%;
+    border-radius: 3px;
+    background: var(--accent);
+  }
+  .rank-count {
+    font-size: 11px;
+    color: var(--accent);
+    font-weight: 700;
+    width: 24px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+  .section-head {
+    font-family: 'Syne', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin: 8px 0 6px;
+  }
+  .legend {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 8px 12px;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10px;
+    color: var(--muted);
+  }
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  /* Custom marker cluster styles */
+  .marker-cluster-small { background-color: rgba(64,192,240,0.2) !important; }
+  .marker-cluster-small div { background-color: rgba(64,192,240,0.7) !important; color: #fff !important; font-family: 'Space Mono', monospace !important; font-size: 11px !important; font-weight: 700 !important; }
+  .marker-cluster-medium { background-color: rgba(240,192,64,0.2) !important; }
+  .marker-cluster-medium div { background-color: rgba(240,192,64,0.7) !important; color: #111 !important; font-family: 'Space Mono', monospace !important; font-size: 11px !important; font-weight: 700 !important; }
+  .marker-cluster-large { background-color: rgba(240,64,96,0.2) !important; }
+  .marker-cluster-large div { background-color: rgba(240,64,96,0.7) !important; color: #fff !important; font-family: 'Space Mono', monospace !important; font-size: 11px !important; font-weight: 700 !important; }
+  .leaflet-popup-content-wrapper {
+    background: var(--card);
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  }
+  .leaflet-popup-tip { background: var(--accent); }
+  .popup-addr { font-weight: 700; color: var(--accent); margin-bottom: 4px; }
+  .popup-city { color: var(--accent2); }
+  .popup-zip { color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📍 ADDRESS CLUSTER MAP</h1>
+  <span>Central Texas Region</span>
+  <div class="stat-pills">
+    <div class="pill">Total: <strong id="totalCount">—</strong></div>
+    <div class="pill">Cities: <strong id="cityCount">—</strong></div>
+    <div class="pill">ZIPs: <strong id="zipCount">—</strong></div>
+  </div>
+</header>
+
+<div class="main">
+  <div id="map"></div>
+  <div class="sidebar">
+    <div class="sidebar-tabs">
+      <button class="tab active" onclick="showTab('zips')">ZIP CODES</button>
+      <button class="tab" onclick="showTab('cities')">CITIES</button>
+    </div>
+    <div class="sidebar-content" id="zipPanel"></div>
+    <div class="sidebar-content" id="cityPanel" style="display:none"></div>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#40c0f0"></div> Austin</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f0c040"></div> Round Rock</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f04060"></div> Cedar Park</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#a040f0"></div> Leander</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#40f0a0"></div> Pflugerville</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f08040"></div> San Antonio</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#808080"></div> Other</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Raw Address Data ─────────────────────────────────────────────────────────
+const rawAddresses = [
+  { addr: "1005 Purple Moor Pass, Leander, TX 78641", city: "Leander", zip: "78641" },
+  { addr: "17412 Cipremont Ln, Pflugerville, TX 78660", city: "Pflugerville", zip: "78660" },
+  { addr: "9512 Pasatiempo Dr, Austin, TX 78717", city: "Austin", zip: "78717" },
+  { addr: "11115 Callanish Park Dr, Austin, TX 78750", city: "Austin", zip: "78750" },
+  { addr: "7009 Villa Maria Ct, Austin, TX 78759", city: "Austin", zip: "78759" },
+  { addr: "7230 Villa Maria Ln, Austin, TX 78759", city: "Austin", zip: "78759" },
+  { addr: "4917 Timberline Dr, Rollingwood, TX 78746", city: "Rollingwood", zip: "78746" },
+  { addr: "11210 Ranch Road 2222 Unit 6304, Austin, TX 78730", city: "Austin", zip: "78730" },
+  { addr: "20812 Carries Ranch Rd, Pflugerville, TX 78660", city: "Pflugerville", zip: "78660" },
+  { addr: "12405 Alameda Trace Circle Unit 1228, Austin, TX 78727", city: "Austin", zip: "78727" },
+  { addr: "410 Terrene Tr, Georgetown, TX 78628", city: "Georgetown", zip: "78628" },
+  { addr: "2411 Steven Ct, Cedar Park, TX 78613", city: "Cedar Park", zip: "78613" },
+  { addr: "400 Riley Rd, Rollingwood, TX 78746", city: "Rollingwood", zip: "78746" },
+  { addr: "360 Hollister Dr, Liberty Hill, TX 78642", city: "Liberty Hill", zip: "78642" },
+  { addr: "3636 Plentywood Ln, Leander, TX 78641", city: "Leander", zip: "78641" },
+  { addr: "4408 Logan Ridge Dr, Cedar Park, TX 78613", city: "Cedar Park", zip: "78613" },
+  { addr: "3000 Colonial Parkway Apt 11208, Cedar Park, TX 78613", city: "Cedar Park", zip: "78613" },
+  { addr: "6912 Barstow Ct, Austin, TX 78749", city: "Austin", zip: "78749" },
+  { addr: "621 Acadia Bnd, Cedar Park, TX 78613", city: "Cedar Park", zip: "78613" },
+  { addr: "1621 Settlers Glen Dr, Round Rock, TX 78665", city: "Round Rock", zip: "78665" },
+  { addr: "316 Majestic Cedar Ct, Liberty Hill, TX 78642", city: "Liberty Hill", zip: "78642" },
+  { addr: "3503 Curtis Dr, Round Rock, TX 78681", city: "Round Rock", zip: "78681" },
+  { addr: "723 Kenney Fort Xing, Round Rock, TX 78665", city: "Round Rock", zip: "78665" },
+  { addr: "725 Edwards Walk Dr, Cedar Park, TX 78613", city: "Cedar Park", zip: "78613" },
+  { addr: "3837 Legend Hill, New Braunfels, TX 78130", city: "New Braunfels", zip: "78130" },
+  { addr: "11400 West Palmer Lane Unit 119, Austin, TX 78717", city: "Austin", zip: "78717" },
+  { addr: "7303 Cissus Cv, Austin, TX 78759", city: "Austin", zip: "78759" },
+  { addr: "9309 Colberg Dr, Austin, TX 78749", city: "Austin", zip: "78749" },
+  { addr: "9005 Tweed Berwick Dr, Austin, TX 78750", city: "Austin", zip: "78750" },
+  { addr: "7320 Fabion Drive, Austin, TX 78759", city: "Austin", zip: "78759" },
+  { addr: "3809 Chance Loop, Round Rock, TX 78681", city: "Round Rock", zip: "78681" },
+  { addr: "16309 Fincastle Dr, Austin, TX 78717", city: "Austin", zip: "78717" },
+  { addr: "13520 Long Island Drive, Pflugerville, TX 78660", city: "Pflugerville", zip: "78660" },
+  { addr: "1236 Firebush Rd, Leander, TX 78641", city: "Leander", zip: "78641" },
+  { addr: "12440 Alameda Trace Circle 1114, Austin, TX 78727", city: "Austin", zip: "78727" },
+  { addr: "9931 Hyatt Resort Drive Apt 616, San Antonio, TX 78251", city: "San Antonio", zip: "78251" },
+  { addr: "6013 York Bridge Cir, Austin, TX 78749", city: "Austin", zip: "78749" },
+  { addr: "17908 Nepi Dr, Pflugerville, TX 78660", city: "Pflugerville", zip: "78660" },
+  { addr: "2682 Mirasol Loop, Round Rock, TX 78681", city: "Round Rock", zip: "78681" },
+  { addr: "1221 Christopher Ave, Round Rock, TX 78681", city: "Round Rock", zip: "78681" },
+  { addr: "12445 Alameda Trace Cir, Austin, TX 78727", city: "Austin", zip: "78727" },
+  { addr: "345 Fannin Battleground Ln, Georgetown, TX 78628", city: "Georgetown", zip: "78628" },
+  { addr: "4016 Anderson Bluff Dr, Cedar Park, TX 78613", city: "Cedar Park", zip: "78613" },
+  { addr: "216 Simmons Dr, Cedar Park, TX 78613", city: "Cedar Park", zip: "78613" },
+  { addr: "10517 Lavon Bnd, Austin, TX 78717", city: "Austin", zip: "78717" },
+  { addr: "9509 Palmbrook Dr, Austin, TX 78717", city: "Austin", zip: "78717" },
+  { addr: "1521 Reprise Bend, Round Rock, TX 78681", city: "Round Rock", zip: "78681" },
+  { addr: "5710 Chestnut Xing, San Antonio, TX 78266", city: "San Antonio", zip: "78266" },
+  { addr: "9400 W Farmer Ln Apt 333, Austin, TX 78717", city: "Austin", zip: "78717" },
+  { addr: "2921 Canto Trce, Leander, TX 78641", city: "Leander", zip: "78641" },
+  { addr: "2613 Shumard Bluff Dr, Leander, TX 78641", city: "Leander", zip: "78641" },
+  { addr: "8406 Lofty Lane, Round Rock, TX 78681", city: "Round Rock", zip: "78681" },
+  { addr: "1401 Hesters Crossing Rd Apt 14108, Round Rock, TX 78681", city: "Round Rock", zip: "78681" },
+  { addr: "15428 Fisher Island Drive, Austin, TX 78717", city: "Austin", zip: "78717" },
+  { addr: "24213 Amara Way, San Antonio, TX 78261", city: "San Antonio", zip: "78261" },
+  { addr: "3410 Flowstone Lane, Round Rock, TX 78681", city: "Round Rock", zip: "78681" },
+  { addr: "7901 Yaupon Dr, Austin, TX 78759", city: "Austin", zip: "78759" },
+  { addr: "11808 Via Grande Dr, Austin, TX 78739", city: "Austin", zip: "78739" },
+  { addr: "3304 Mossy Grove Ct, Cedar Park, TX 78613", city: "Cedar Park", zip: "78613" },
+  { addr: "2916 Miletto Dr, Round Rock, TX 78665", city: "Round Rock", zip: "78665" },
+  { addr: "1329 Weatherford Ln, Leander, TX 78641", city: "Leander", zip: "78641" },
+  { addr: "16024 Nightshade St, Austin, TX 78728", city: "Austin", zip: "78728" },
+  { addr: "1650 Homestead Farms Dr, Round Rock, TX 78665", city: "Round Rock", zip: "78665" },
+  { addr: "1906 Nelson Ranch Loop, Cedar Park, TX 78613", city: "Cedar Park", zip: "78613" },
+  { addr: "9605 Palmbrook Dr, Austin, TX 78717", city: "Austin", zip: "78717" },
+  { addr: "145 Groundhog Drive, Buda, TX 78610", city: "Buda", zip: "78610" },
+  { addr: "9001 Amberglen Blvd Apt 4101, Austin, TX 78729", city: "Austin", zip: "78729" },
+  { addr: "14815 Avery Ranch Blvd Unit 101, Austin, TX 78717", city: "Austin", zip: "78717" },
+  { addr: "2426 Olive Way, San Antonio, TX 78259", city: "San Antonio", zip: "78259" },
+  { addr: "1824 Via Levanzo Rd, Leander, TX 78641", city: "Leander", zip: "78641" },
+  { addr: "17727 San Felipe Bay, San Antonio, TX 78255", city: "San Antonio", zip: "78255" },
+  { addr: "8414 Noella Way, San Antonio, TX 78240", city: "San Antonio", zip: "78240" },
+  { addr: "7714 Kennedy Hill Dr, San Antonio, TX 78235", city: "San Antonio", zip: "78235" },
+  { addr: "6813 Teulada Dr, Austin, TX 78739", city: "Austin", zip: "78739" },
+  { addr: "4509 Zachary's Run, Cedar Park, TX 78613", city: "Cedar Park", zip: "78613" },
+  { addr: "12800 Center Lake Dr #916, Austin, TX 78753", city: "Austin", zip: "78753" },
+  { addr: "3801 Links Ln, Round Rock, TX 78664", city: "Round Rock", zip: "78664" },
+  { addr: "3805 Sir Noah Tucker Dr, Round Rock, TX 78681", city: "Round Rock", zip: "78681" },
+  { addr: "14221 Canyon Trl, Austin, TX 78717", city: "Austin", zip: "78717" },
+  { addr: "1521 Da Vinci Trl, Leander, TX 78641", city: "Leander", zip: "78641" },
+  { addr: "2221 Novara Trl, Leander, TX 78641", city: "Leander", zip: "78641" },
+  { addr: "400 Jeffrey David Ln E, Austin, TX 78717", city: "Austin", zip: "78717" },
+  { addr: "740 Pioneer Grv, Round Rock, TX 78665", city: "Round Rock", zip: "78665" },
+  { addr: "201 Archipelago Trl, Austin, TX 78717", city: "Austin", zip: "78717" },
+  { addr: "509 Golden Creek Dr, Round Rock, TX 78664", city: "Round Rock", zip: "78664" },
+  { addr: "222 Ramsay Street Apt 128, San Marcos, TX 78666", city: "San Marcos", zip: "78666" },
+  { addr: "Valley Vista, Leander, TX 78641", city: "Leander", zip: "78641" },
+];
+
+// ── Geocode lookup (lat/lng per zip code centroid) ────────────────────────────
+const zipCentroids = {
+  "78641": [30.5788, -97.8528], // Leander
+  "78660": [30.4380, -97.6200], // Pflugerville
+  "78717": [30.5016, -97.7989], // Austin NW
+  "78750": [30.4593, -97.7809], // Austin NW
+  "78759": [30.4257, -97.7641], // Austin NW
+  "78746": [30.2954, -97.8181], // Rollingwood/Austin
+  "78730": [30.3959, -97.8147], // Austin
+  "78727": [30.4605, -97.7211], // Austin N
+  "78628": [30.6283, -97.6790], // Georgetown
+  "78613": [30.5022, -97.8199], // Cedar Park
+  "78642": [30.6648, -97.9180], // Liberty Hill
+  "78749": [30.2118, -97.8480], // Austin SW
+  "78665": [30.5271, -97.6260], // Round Rock E
+  "78681": [30.5183, -97.6892], // Round Rock W
+  "78130": [29.7058, -98.1244], // New Braunfels
+  "78251": [29.5018, -98.6742], // San Antonio NW
+  "78266": [29.7070, -98.3120], // San Antonio NE
+  "78261": [29.6930, -98.4110], // San Antonio NE
+  "78729": [30.4686, -97.7596], // Austin N
+  "78739": [30.1846, -97.8691], // Austin SW
+  "78728": [30.4729, -97.6846], // Austin N
+  "78664": [30.5235, -97.6474], // Round Rock
+  "78610": [30.0870, -97.8308], // Buda
+  "78259": [29.6366, -98.3898], // San Antonio NE
+  "78255": [29.6212, -98.6394], // San Antonio NW
+  "78240": [29.5256, -98.6138], // San Antonio NW
+  "78235": [29.3501, -98.5053], // San Antonio S
+  "78753": [30.3819, -97.6747], // Austin NE
+  "78666": [29.8880, -97.9414], // San Marcos
+};
+
+// City color palette
+const cityColors = {
+  "Austin": "#40c0f0",
+  "Round Rock": "#f0c040",
+  "Cedar Park": "#f04060",
+  "Leander": "#a040f0",
+  "Pflugerville": "#40f0a0",
+  "San Antonio": "#f08040",
+  "Georgetown": "#60c080",
+  "Liberty Hill": "#e060c0",
+  "Rollingwood": "#c0e040",
+  "New Braunfels": "#40a0ff",
+  "Buda": "#ff8060",
+  "San Marcos": "#80ffb0",
+};
+
+function cityColor(city) {
+  return cityColors[city] || "#808080";
+}
+
+// Scatter coordinates with small jitter for same-zip addresses
+function jitter(val, amount = 0.018) {
+  return val + (Math.random() - 0.5) * amount;
+}
+
+// ── Map init ─────────────────────────────────────────────────────────────────
+const map = L.map('map', { zoomControl: true }).setView([30.3500, -97.9000], 10);
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+  subdomains: 'abcd',
+  maxZoom: 19
+}).addTo(map);
+
+const markers = L.markerClusterGroup({
+  maxClusterRadius: 60,
+  spiderfyOnMaxZoom: true,
+  showCoverageOnHover: true,
+  zoomToBoundsOnClick: true,
+  iconCreateFunction: function(cluster) {
+    const count = cluster.getChildCount();
+    let size = count < 10 ? 'small' : count < 20 ? 'medium' : 'large';
+    return L.divIcon({
+      html: `<div>${count}</div>`,
+      className: `marker-cluster marker-cluster-${size}`,
+      iconSize: L.point(40, 40)
+    });
+  }
+});
+
+// Place markers
+const placed = [];
+rawAddresses.forEach(item => {
+  const centroid = zipCentroids[item.zip];
+  if (!centroid) return;
+  const lat = jitter(centroid[0]);
+  const lng = jitter(centroid[1]);
+
+  const color = cityColor(item.city);
+  const icon = L.divIcon({
+    html: `<div style="width:10px;height:10px;border-radius:50%;background:${color};border:2px solid rgba(255,255,255,0.4);box-shadow:0 0 6px ${color}88;"></div>`,
+    className: '',
+    iconSize: [10, 10],
+    iconAnchor: [5, 5]
+  });
+
+  const marker = L.marker([lat, lng], { icon });
+  marker.bindPopup(`
+    <div class="popup-addr">${item.addr.split(',')[0]}</div>
+    <div class="popup-city">${item.city}</div>
+    <div class="popup-zip">ZIP: ${item.zip}</div>
+  `);
+  markers.addLayer(marker);
+  placed.push({ ...item, lat, lng });
+});
+
+map.addLayer(markers);
+
+// ── Stats ─────────────────────────────────────────────────────────────────────
+const zipCounts = {};
+const cityCounts = {};
+rawAddresses.forEach(r => {
+  zipCounts[r.zip] = (zipCounts[r.zip] || 0) + 1;
+  cityCounts[r.city] = (cityCounts[r.city] || 0) + 1;
+});
+
+const total = rawAddresses.length;
+document.getElementById('totalCount').textContent = total;
+document.getElementById('cityCount').textContent = Object.keys(cityCounts).length;
+document.getElementById('zipCount').textContent = Object.keys(zipCounts).length;
+
+// ── Sidebar ZIP panel ─────────────────────────────────────────────────────────
+const sortedZips = Object.entries(zipCounts).sort((a,b) => b[1]-a[1]);
+const maxZip = sortedZips[0][1];
+const zipPanel = document.getElementById('zipPanel');
+
+// City name lookup for zip
+const zipCity = {};
+rawAddresses.forEach(r => { zipCity[r.zip] = zipCity[r.zip] || r.city; });
+
+zipPanel.innerHTML = '<div class="section-head">Top ZIP Codes by Frequency</div>';
+sortedZips.forEach(([zip, count], i) => {
+  const pct = Math.round((count / maxZip) * 100);
+  const city = zipCity[zip] || '';
+  const color = cityColor(city);
+  const div = document.createElement('div');
+  div.className = 'rank-item';
+  div.innerHTML = `
+    <div class="rank-num">#${i+1}</div>
+    <div class="rank-label">${zip}<small>${city}</small></div>
+    <div class="rank-bar-wrap"><div class="rank-bar" style="width:${pct}%;background:${color}"></div></div>
+    <div class="rank-count" style="color:${color}">${count}</div>
+  `;
+  div.addEventListener('click', () => {
+    const c = zipCentroids[zip];
+    if (c) map.setView(c, 13);
+  });
+  zipPanel.appendChild(div);
+});
+
+// ── Sidebar City panel ────────────────────────────────────────────────────────
+const sortedCities = Object.entries(cityCounts).sort((a,b) => b[1]-a[1]);
+const maxCity = sortedCities[0][1];
+const cityPanel = document.getElementById('cityPanel');
+
+cityPanel.innerHTML = '<div class="section-head">Cities by Address Count</div>';
+sortedCities.forEach(([city, count], i) => {
+  const pct = Math.round((count / maxCity) * 100);
+  const color = cityColor(city);
+  const div = document.createElement('div');
+  div.className = 'rank-item';
+  div.innerHTML = `
+    <div class="rank-num">#${i+1}</div>
+    <div class="rank-label">${city}</div>
+    <div class="rank-bar-wrap"><div class="rank-bar" style="width:${pct}%;background:${color}"></div></div>
+    <div class="rank-count" style="color:${color}">${count}</div>
+  `;
+  cityPanel.appendChild(div);
+});
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function showTab(which) {
+  document.getElementById('zipPanel').style.display = which === 'zips' ? 'block' : 'none';
+  document.getElementById('cityPanel').style.display = which === 'cities' ? 'block' : 'none';
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    t.classList.toggle('active', (i===0 && which==='zips') || (i===1 && which==='cities'));
+  });
+}
+</script>
+</body>
+</html>
